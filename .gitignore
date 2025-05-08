@@ -1,0 +1,15 @@
+.idea
+__pycache__
+pretrain
+Info
+*.log
+*.pth
+*.csv
+*.onnx
+wandb
+result
+*.ipynb_checkpoints
+results
+predict
+*.baiduyun.uploading.cfg
+!flow_chart.png

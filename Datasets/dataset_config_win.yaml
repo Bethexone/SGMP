@@ -1,0 +1,20 @@
+# Dataset paths.
+TSIRMT:
+  train_seqs_file: D:\Project\Pycharm\InfraRed_Det\SGMP_Unet\Datasets\TSIRMT\train_new.txt
+  val_seqs_file: D:\Project\Pycharm\InfraRed_Det\SGMP_Unet\Datasets\TSIRMT\val_new.txt
+  img_path: D:\Project\dataset\InfraRed\TSIRMT\images
+  mask_path: D:\Project\dataset\InfraRed\TSIRMT\masks
+
+NUDT-MIRSDT:
+  train_seqs_file: D:\Project\Pycharm\InfraRed_Det\SGMP_Unet\Datasets\NUDT-MIRSDT\train_new.txt
+  val_seqs_file: D:\Project\Pycharm\InfraRed_Det\SGMP_Unet\Datasets\NUDT-MIRSDT\val_new.txt
+  img_path: D:\Project\dataset\InfraRed\NUDT-MIRSDT\images
+  mask_path: D:\Project\dataset\InfraRed\NUDT-MIRSDT\masks
+
+IRDST:
+  train_seqs_file: D:\Project\Pycharm\InfraRed_Det\SGMP_Unet\Datasets\IRDST\train_new.txt
+  val_seqs_file: D:\Project\Pycharm\InfraRed_Det\SGMP_Unet\Datasets\IRDST\val_new.txt
+  img_path: D:\Project\dataset\InfraRed\IRDST\images
+  mask_path: D:\Project\dataset\InfraRed\IRDST\masks
+
+
