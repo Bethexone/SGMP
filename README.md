@@ -100,6 +100,6 @@ We would like to thank the open-source projects with  special thanks to [video s
 
 ## Citation
 
-Please consider citing our paper in your publications if the project helps your research. BibTeX reference is as follow.
+Please consider citing our paper in your publications if the project helps your research. BibTeX reference is as follow.  
 Cite as: Wei Zhang, Tao Liu, Tianhang Guan, et al. SGMP: Spatial-Semantic Guided Motion-Aware for Infrared Small Targets. TechRxiv. June 05, 2025.
 DOI: 10.36227/techrxiv.174909854.43812513/v1Registration in progress
