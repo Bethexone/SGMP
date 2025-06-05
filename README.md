@@ -1,6 +1,6 @@
 ## PyTorch implementation of "SGMP: Spatial-Semantic Guided Motion-Aware UNet for Infrared Small Targets"
-<!-- [Project](https://github.com/Bethexone/SGMP.git) - [Paper]([https://ieeexplore.ieee.org/document/10758760](https://www.techrxiv.org/users/921880/articles/1296074-sgmp-spatial-semantic-guided-motion-aware-for-infrared-small-targets)) -->
-<!-- <hr> -->
+[Project](https://github.com/Bethexone/SGMP.git) - [Paper](https://www.techrxiv.org/users/921880/articles/1296074-sgmp-spatial-semantic-guided-motion-aware-for-infrared-small-targets)
+<hr>
 
 # Abstract
 
