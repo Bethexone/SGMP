@@ -1,0 +1,46 @@
+dataset_name: IRDST
+num_frames: 6
+experiment_name: SGMP_exp_{params_summary}
+output_root: outputs/
+use_wandb: false
+wandb_user: null
+wandb_project: SGMP-UNet
+wandb_resume_id: null
+
+mask_loss_coef: 1
+dice_loss_coef: 1
+bbox_loss_coef: 5
+giou_loss_coef: 2
+eos_coef: 0.1
+remove_difficult: false
+num_fusion_head: [2, 2, 2, 2]
+
+is_train: true
+eval_train: true
+eval_interval: 5
+eval_val_interval: 1
+viz_freq: 500
+train_print_freq: 10
+lr: 0.0001
+lr_backbone: 0.00001
+end_lr: 0.0000001
+poly_power: 0.9
+weight_decay: 0.0003
+cos_cycle: 10
+cos_mult: 1
+
+aux_loss: 0.5
+aux_loss_norm: 0
+start_epoch: 0
+epochs: 30
+clip_max_norm: 0.1
+batch_size: 4
+batch_eval: 4
+train_size: 320
+val_size: 320
+
+seed: 42
+num_workers: 4
+world_size: 1
+dist_url: env://
+log_file: null

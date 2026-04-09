@@ -1,0 +1,20 @@
+st_model: SGMP-UNet
+batch_size: 1
+num_frames: 6
+val_size: 320
+pre_norm: false
+is_train: false
+
+model_path: null
+save_pred: true
+masks: true
+dataset: IRDST
+sequence_names: null
+output_root: outputs/
+msc: true
+flip: true
+
+seed: 42
+num_workers: 4
+world_size: 1
+dist_url: env://

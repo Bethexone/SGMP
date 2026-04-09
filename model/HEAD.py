@@ -12,7 +12,7 @@ from model.third_party_models.swin_transformer import SwinTransformerBlockV2, Sh
 from model.SWTM_Decoder import Patch_Expand
 
 
-class Multiscale_Former(nn.Module):
+class HEAD(nn.Module):
     def __init__(self,
                  embed_dim: int,
                  depths: List[int] = None,
@@ -26,7 +26,7 @@ class Multiscale_Former(nn.Module):
                  block: Optional[Callable[..., nn.Module]] = None,
                  upsample_layer: Callable[..., nn.Module] = Patch_Expand,
                  ):
-        super(Multiscale_Former, self).__init__()
+        super(HEAD, self).__init__()
         if depths is None:
             depths = [2, 2]
         if num_heads is None:
@@ -146,7 +146,7 @@ class Reshape(nn.Module):
 
 if __name__ == '__main__':
     x = torch.randn(10, 80, 80, 96)
-    Former = Multiscale_Former(96)
+    Former = HEAD(96)
     from torchinfo import summary
 
     summary(Former, input_data=x)

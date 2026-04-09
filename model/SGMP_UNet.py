@@ -5,16 +5,19 @@ import torch
 
 from model.SGMP_Encoder import SGMP_Encoder
 from model.MSMU import MSMU
-from model.SWTM_Decoder import Decoder
+from model.SWTM_Decoder import SWTM_Decoder
 from torch import nn
-from model.Head import Multiscale_Former
+from model.HEAD import HEAD
+from utils.model_inputs import ModelInputs
 
 
 class Net(nn.Module):
     def __init__(self, num_tl, embed_dim=96, is_train=True, num_fusion_head=None):
         super(Net, self).__init__()
         self.num_tl = num_tl // 2
-        self.encoder = SGMP_Encoder(self.num_tl, embed_dim=embed_dim, num_msca_heads=num_fusion_head, is_train=is_train)
+        self.encoder = SGMP_Encoder(self.num_tl, embed_dim=embed_dim,
+                                    is_train=is_train,
+                                    num_fusion_heads=num_fusion_head)
 
         self.skip_layers = nn.Sequential()
 
@@ -27,8 +30,8 @@ class Net(nn.Module):
             self.skip_layers.append(skip)
 
         decode_embeddim = embed_dim * 2 ** 3
-        self.decoder = Decoder(decode_embeddim)
-        self.former = Multiscale_Former(embed_dim)
+        self.decoder = SWTM_Decoder(decode_embeddim)
+        self.former = HEAD(embed_dim)
 
     def configure_param(self, lr, lr_backbone):
         params = []
@@ -38,7 +41,7 @@ class Net(nn.Module):
         decoder_params = self.decoder.configure_param(lr)
         former_params = self.former.configure_param(lr)
 
-        # skip_params 包含 'params' 和 'lr'
+        # skip_params 应该是一个字典，包含 'params' 和 'lr'
         skip_params = {'params': self.skip_layers.parameters(), 'lr': lr}
 
         # 将每个参数组添加到 params 列表中
@@ -49,16 +52,18 @@ class Net(nn.Module):
 
         return params
 
-    def forward(self, sample):
+    def forward(self, inputs: ModelInputs):
         # import ipdb;ipdb.set_trace()
-        assert sample.num_tl == self.num_tl * 2
-        assert sample.FrameH % 16 == 0
-        assert sample.FrameW % 16 == 0
-        x, y = sample.decompose()
+        num_frames = inputs.num_frames
+        assert num_frames == self.num_tl * 2
+        h, w = inputs.frame.shape[-2:]
+        assert h % 16 == 0
+        assert w % 16 == 0
+        x, y = inputs.decompose()
         skip_s = self.encoder(x, y)
         # summary(self.encoder, input_data=[x, y])
-        for skip_i in skip_s:
-            print(skip_i.shape)
+        # for skip_i in skip_s:
+        #     print(skip_i.shape)
         decode_s = []
         # for skip_layer, skip_tensor in zip(self.skip_layers, skip_s):
         #     decode_s.append(skip_layer(skip_tensor))
@@ -96,15 +101,9 @@ if __name__ == '__main__':
     # for i in tmp:
     #     print(i.shape)
     #
-    from Datasets.datasets.utils import NestedTensor
-
     x = torch.randn(1, 3, 320, 256)
     y = torch.randn(1, 3, num_tl, 320, 256)
-    img = [(x, y)] * 10
-    sample = NestedTensor(img)
-    sample.frame = x
-    sample.frame_sequence = y
-    sample.num_tl = num_tl
+    sample = ModelInputs(frame=x, frame_sequence=y)
     # from torchinfo import summary
 
     # summary(model, input_data=sample, depth=10)

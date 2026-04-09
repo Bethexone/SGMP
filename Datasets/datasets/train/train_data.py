@@ -41,14 +41,7 @@ class TrainDataset(Dataset):
         assert train_size % 32 == 0
 
         if path_config is None:
-            if os.name == 'nt':
-                path_config = 'Datasets/dataset_config_win.yaml'
-            elif os.name == 'posix':
-                hostname = socket.gethostname()  # 最简单可靠的方法
-                if hostname == 'lq':
-                    path_config = 'Datasets/dataset_config_lq.yaml'
-                else:
-                    path_config = 'Datasets/dataset_config_wsl.yaml'
+            return
 
         # 读取 YAML 文件
         with open(path_config, "r", encoding="utf-8") as f:

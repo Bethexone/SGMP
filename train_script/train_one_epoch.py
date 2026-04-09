@@ -2,13 +2,12 @@
 # @Author  : Zhangwei
 # @Time    : 2025/3/20 13:43
 import socket
+import sys
 
 import math
 import os
 from pathlib import Path
 from typing import Iterable
-
-import wandb
 
 from utils import misc
 import torch
@@ -29,21 +28,15 @@ logger.setLevel(logging.DEBUG)
 
 
 def record_csv(filepath, row):
-    with open(filepath, 'a') as f:
+    with open(filepath, 'a', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(row)
     return
 
 
-def create_data_loaders(args, eval_train=False):
-    if os.name == 'nt':
-        path_config = 'Datasets/dataset_config_win.yaml'
-    elif os.name == 'posix':
-        hostname = socket.gethostname()  # 最简单可靠的方法
-        if hostname == 'lq':
-            path_config = 'Datasets/dataset_config_lq.yaml'
-        else:
-            path_config = 'Datasets/dataset_config_wsl.yaml'
+def create_data_loaders(args, eval_train=False, eval_on_main_only=False):
+    path_config = getattr(args, 'dataset_config', None)
+    print(path_config)
 
     dataset_train = TrainDataset(name_dataset=args.dataset_name, num_frames=args.num_frames, train_size=args.train_size,
                                  path_config=path_config)
@@ -63,7 +56,7 @@ def create_data_loaders(args, eval_train=False):
 
     dataset_val = ValDataset(name_dataset=args.dataset_name, num_frames=args.num_frames, val_size=args.val_size,
                              path_config=path_config)
-    if args.distributed:
+    if args.distributed and not eval_on_main_only:
         sampler_val = DistributedSampler(dataset_val, shuffle=False)
     else:
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
@@ -75,33 +68,38 @@ def create_data_loaders(args, eval_train=False):
                                  collate_fn=collate_fn,
                                  num_workers=args.num_workers)
     if eval_train:
-        sampler = torch.utils.data.SequentialSampler(dataset_train)
+        if args.distributed and not eval_on_main_only:
+            sampler = DistributedSampler(dataset_train, shuffle=False)
+        else:
+            sampler = torch.utils.data.SequentialSampler(dataset_train)
         batch_sampler = torch.utils.data.BatchSampler(
             sampler, args.batch_eval, drop_last=True)
         eval_trainloader = DataLoader(dataset_train, batch_sampler=batch_sampler, collate_fn=collate_fn,
                                       num_workers=args.num_workers)
-        return data_loader_train, data_loader_val, eval_trainloader
+        return data_loader_train, data_loader_val, eval_trainloader, sampler_train
     else:
-        return data_loader_train, data_loader_val
+        return data_loader_train, data_loader_val, sampler_train
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, max_norm: float = 0,
-                    output_viz_dir=Path('./outputs/'), use_wandb: bool = False,
-                    viz_freq: int = 700, total_epochs=15, args=None):
+                    device: torch.device, epoch: int, output_viz_dir=Path('./outputs/'), args=None):
     metric_logger = misc.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', misc.SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    total_epochs = args.epochs if args else 1
     header = 'Train Epoch: [{}/{}]:'.format(epoch, total_epochs)
 
     inverse_norm_transform = T.InverseNormalizeTransforms()
-    if not os.path.exists(output_viz_dir):
-        os.makedirs(output_viz_dir)
-    _loss_t_csv_fn = os.path.join(output_viz_dir, 'loss.csv')
-    if epoch == 0 and os.path.exists(_loss_t_csv_fn):
+    if misc.is_main_process() and not os.path.exists(output_viz_dir):
+        os.makedirs(output_viz_dir, exist_ok=True)
+    metrics_dir = Path(args.output_dir) / 'metrics' if args and args.output_dir else Path('./outputs/')
+    if misc.is_main_process() and not os.path.exists(metrics_dir):
+        os.makedirs(metrics_dir, exist_ok=True)
+    _loss_t_csv_fn = os.path.join(metrics_dir, 'loss.csv')
+    if misc.is_main_process() and epoch == 0 and os.path.exists(_loss_t_csv_fn):
         os.rename(_loss_t_csv_fn, os.path.join(output_viz_dir, 'loss_{}.csv'.format(time.time())))
 
-    print_freq = 10  # 打印频率，后续打印结果在misc.log_every函数中
+    print_freq = args.train_print_freq if args and args.train_print_freq else 10  # 打印频率，后续打印结果在misc.log_every函数中
 
     model.train()
     criterion.train()
@@ -114,9 +112,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     for samples, targets in metric_logger.log_every(data_loader, print_freq, header):
         i_iter = i_iter + 1
         # print(fr'{samples:}', samples.shape)
-        samples.to(device)
+        samples = samples.to(device)
         targets = [
-            {k: v.to(device) if k == 'masks' else v for k, v in target.items()}
+            {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in target.items()}
             for target in targets
         ]
         outputs = model(samples)
@@ -141,25 +139,27 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
 
         optimizer.zero_grad()
         losses.backward()
-        if max_norm > 0:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+        if args and args.clip_max_norm and args.clip_max_norm > 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_max_norm)
         optimizer.step()
 
         metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
-        if use_wandb:
+        if args and args.use_wandb and misc.is_main_process():
+            import wandb
             wandb_dict = {'loss': loss_value, 'lr': optimizer.param_groups[0]["lr"]}
-            if i_iter % viz_freq == 0:
+            if args.viz_freq and i_iter % args.viz_freq == 0:
                 viz_img = get_viz_img(samples.frame, targets, outputs, inverse_norm_transform)
                 wandb_dict['train_viz_img'] = wandb.Image(viz_img)
             wandb.log(wandb_dict)
         loss_sum += float(loss_value)
         item_count += 1
-        if i_iter % 50 == 49:
+        if args and args.train_print_freq and i_iter % args.train_print_freq == args.train_print_freq - 1:
             loss_avg = loss_sum / item_count
             loss_sum = 0
             item_count = 0
-            record_csv(_loss_t_csv_fn, ['%e' % loss_avg])
+            if misc.is_main_process():
+                record_csv(_loss_t_csv_fn, ['%e' % loss_avg])
         # import ipdb;ipdb.set_trace()
         # break
     metric_logger.synchronize_between_processes()
@@ -185,10 +185,10 @@ if __name__ == '__main__':
     from Datasets.datasets.utils import collate_fn
     from Datasets.datasets.val.val_data import ValDataset
     from model.criterions import SetCriterion
-    from model.net import Net
+    from model.SGMP_UNet import Net
     from utils import misc
     from utils.torch_poly_lr_decay import PolynomialLRDecay
-    from train import get_args_parser, record_csv
+    from train_script.get_args_parser import get_args_parser
 
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
@@ -218,8 +218,9 @@ if __name__ == '__main__':
         lr_scheduler = PolynomialLRDecay(optimizer, max_decay_steps=args.epochs - 1, end_learning_rate=args.end_lr,
                                          power=args.poly_power)
         data_loader_train, data_loader_val = create_data_loaders(parsed_args)
+        output_viz_dir = Path(args.output_dir) / 'viz' if args.output_dir else Path('./outputs/')
         train_one_epoch(model, criterion, data_loader=data_loader_train, optimizer=optimizer, device=device, epoch=0,
-                        args=args)
+                        output_viz_dir=output_viz_dir, args=args)
 
 
     args_parser = argparse.ArgumentParser('train script', parents=[get_args_parser()])

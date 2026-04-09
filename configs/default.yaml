@@ -1,0 +1,5 @@
+dataset_config_paths:
+  win: Datasets/dataset_config_win.yaml
+  wsl: Datasets/dataset_config_wsl.yaml
+  ubuntu22: Datasets/dataset_config_ubuntu22.yaml
+device: auto

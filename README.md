@@ -1,105 +1,192 @@
-## PyTorch implementation of "SGMP: Spatial-Semantic Guided Motion-Aware UNet for Infrared Small Targets"
+# SGMP-UNet
+
+PyTorch implementation of `SGMP-UNet: Spatial-Semantic Guided Motion-Aware UNet for Infrared Small Targets`.
+
 [Project](https://github.com/Bethexone/SGMP.git) - [Paper](https://www.techrxiv.org/users/921880/articles/1296074-sgmp-spatial-semantic-guided-motion-aware-for-infrared-small-targets)
-<hr>
 
-# Abstract
+![Architecture](flow_chart.png)
 
-<p align="justify">
-In temporal infrared small target detection, the effective exploitation of motion pattern discrepancies between targets and backgrounds is crucial for achieving accurate detection. Although existing convolutional neural network (CNN)-based architectures benefit from local feature perception, their limited receptive fields hinder the modeling of long-range temporal dependencies, especially in scenes with dynamically complexity, leading to a notable degradation in feature discrimination. While Transformer-based architectures have been demonstrated to address the issue of long-sequence dependency through selfattention mechanisms. However the uniform global interaction tends to dilute the representation of subtle local motion patterns, which are crucial for small target detection. To overcome these limitations, we propose a novel backbone network, called Spatial Semantic-Guided Motion Perception (SGMP). SGMP introduces a spatially semantic-guided attention mechanism that (i) leverages spatial features to generate salient semantic query vectors and value maps for extracting potential semantic priors of targets, and (ii) incorporates a Transformer encoder to model longrange motion features, aligning global motion context with local semantic cues across modalities. The design enables it to focus on motion-sensitive spatiotemporal regions associated with small targets. Built upon SGMP, we design a lightweight and efficient detection framework called SGMP-UNet, which fully exploits motion-aware representations for end-to-end small target detection. Extensive experiments on the NUDT-MIRSDT, IRDST and TSIRMT datasets demonstrate that SGMP-UNet consistently outperforms state-of-the-art (SOTA) methods across multiple evaluation metrics.
-</p>
+## Overview
 
-# Architecture
+This repository contains the training and inference code for SGMP-UNet on infrared small target detection benchmarks.
 
-<p align="center">
-  <img src="flow_chart.png"  style="width: auto;" alt="accessibility text">
-</p>
+Included in this repository:
 
-## Environment Setup
+- model code, training code, inference code, utilities
+- split files such as `train_new.txt` and `val_new.txt`
+- public configuration files under `configs/` and `Datasets/`
 
-The experiments were done on **Ubuntu 20.04.6 LTS** with **python 3** using anaconda environment. Here is details on how to set up the conda environment.
+Not included in this repository:
 
-* Create conda environment:
+- raw datasets
+- model checkpoints
+- training outputs and prediction results
+- local environment files and machine-specific private configs
 
-  ```create environment
-  conda create -n SGMP python
-  conda activate SGMP
-  ```
+## Environment
 
-* Install **PyTorch 2.6.0** with **cuda 12.4**
+The current codebase is maintained against Python 3.12 and PyTorch 2.6.0 with CUDA 12.4.
 
-  ```setup
-  pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
-  ```
+```bash
+conda create -n sgmp python=3.12
+conda activate sgmp
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+pip install -r requirements.txt
+```
 
-* Install other requirements:
+All commands below assume the current working directory is the repository root.
 
-  ```setup
-  pip install -r requirements.txt
-  ```
+## Repository Layout
 
-## Datasets
+- `configs/`: base, training, and inference configs
+- `Datasets/`: split files, dataset config templates, and dataloader code
+- `model/`: SGMP-UNet network definition
+- `train_script/`: training entrypoint
+- `test_script/`: inference entrypoint
+- `utils/`: metrics, logging, config loading, and output helpers
 
-We evaluate network performance using **NUDR-MIRSDT**, **IRDST** and **TSIRMT**
+## Data Preparation
 
-Download the datasets following the corresponding paper/project page and update dataset paths in **'datasets/path_config.py'**.
-Here is the list of datasets used.
+Supported dataset names in code:
 
-* [IRDST](https://pan.baidu.com/s/1OA9uFtAzkknn3pFYGO4R0Q?pwd=6m32) (Extraction code: 6m32)
-* [NUDT-MIRSDT](https://pan.baidu.com/s/1qrERzVrEYQ7ToRToMuV47Q?pwd=i5ce)(Extraction code: i5ce)
-* [TSIRMT](https://pan.baidu.com/s/1-05XbfxNDRHNtDBstZxccg?pwd=r29f)(Extraction code: r29f)
+- `IRDST`
+- `NUDT-MIRSDT`
+- `TSIRMT`
+- `TSIRMT_tiny`
 
-# Training
+Download the raw datasets from the corresponding project or paper pages, then edit one dataset config file before running anything:
 
-The models were trained and tested using a single NVIDIA A5000 GPU.  
+- `Datasets/dataset_config_win.yaml`
+- `Datasets/dataset_config_wsl.yaml`
+- `Datasets/dataset_config_ubuntu22.yaml`
 
-* Train LMAFormer with Swin backbone on NUDT-MIRSDR, IRDST, TSIRMT datasets:
+Rules:
 
-  ```bash
-  python -m train_script.train
-  ```
+- keep `train_seqs_file` and `val_seqs_file` as the repo-relative split files already provided here
+- change `img_path` and `mask_path` to your local dataset directories
+- pass the selected config explicitly with `--dataset_config`
 
-# Inference
+Example structure inside a dataset config:
 
-## Inference on IRDST
+```yaml
+IRDST:
+  train_seqs_file: Datasets/IRDST/train_new.txt
+  val_seqs_file: Datasets/IRDST/val_new.txt
+  img_path: /path/to/IRDST/images
+  mask_path: /path/to/IRDST/masks
+```
 
-  ```bash
-  python -m test_script.inference  --model_path ./result/IRDST/checkpoint_IRDST_val_miou_0.610.pth  --dataset IRDST --flip --msc --output_dir ./predict
+## Training
 
-  Expected miou: 60.80
-  ```
+Default training config lives in `configs/train.yaml`. The default dataset in that file is `IRDST`. To train from a fresh clone, pass your dataset config explicitly:
 
-## Inference on NUDT-MIRSDT
+```bash
+python -m train_script.train --dataset_config Datasets/dataset_config_win.yaml
+```
 
-  ```bash
-  python -m test_script.inference  --model_path ./result/NUDT-MIRSDT/checkpoint_NUDT-MIRSDT_val_miou_0.763.pth  --dataset NUDT-MIRSDT --flip --msc --output_dir ./predict
+Train on another dataset by overriding `dataset_name`:
 
-  Expected miou: 74.87
-  ```
+```bash
+python -m train_script.train --dataset_config Datasets/dataset_config_win.yaml --dataset_name NUDT-MIRSDT
+```
 
-## Inference on TSIRMT
+Optional:
 
-  ```bash
-  python -m test_script.inference  --model_path ./result/TSIRMT/checkpoint_TSIRMT_val_miou_0.668.pth  --dataset TSIRMT --flip --msc  --output_dir ./predict
-  
-  Expected miou: 66.81
-  ```
+- enable Weights & Biases with `--use_wandb`
+- override `--output_root`, `--batch_size`, `--epochs`, or other fields from `configs/train.yaml`
 
-## Results Summary
+Training outputs are written to:
 
-### Results on NUDT-MIRSDT, IRDST and TSIRMT
+```text
+outputs/<dataset_name>/<experiment_name>/train
+```
+
+Typical files in the training output directory:
+
+- `train.log`
+- `exp_config.yaml`
+- `checkpoint_last.pth`
+- metric-tagged checkpoints such as `checkpoint_0009_val_miou_0.727.pth`
+
+## Inference
+
+The following examples use repository-relative checkpoint paths under `result/`. The repository does not ship these weight files. Download the checkpoints from Baidu Netdisk and place them at the exact relative paths shown below before running inference.
+
+Expected local checkpoint paths:
+
+- `result/checkpoint_IRDST_val_miou_0.612/checkpoint_best_val_miou_0.612.pth`
+- `result/checkpoint_NUDT-MIRSDT_val_miou_0.727/checkpoint_best_val_miou_0.727.pth`
+- `result/checkpoint_TSIRMT_val_miou_0.673/checkpoint_best_val_miou_0.673.pth`
+
+Inference entrypoint:
+
+```bash
+python -m test_script.inference --dataset_config Datasets/dataset_config_win.yaml --dataset <DATASET_NAME> --model_path <CHECKPOINT_PATH>
+```
+
+Example on `IRDST`:
+
+```bash
+python -m test_script.inference --dataset_config Datasets/dataset_config_win.yaml --dataset IRDST --model_path result/checkpoint_IRDST_val_miou_0.612/checkpoint_best_val_miou_0.612.pth
+```
+
+Example on `NUDT-MIRSDT`:
+
+```bash
+python -m test_script.inference --dataset_config Datasets/dataset_config_win.yaml --dataset NUDT-MIRSDT --model_path result/checkpoint_NUDT-MIRSDT_val_miou_0.727/checkpoint_best_val_miou_0.727.pth
+```
+
+Example on `TSIRMT`:
+
+```bash
+python -m test_script.inference --dataset_config Datasets/dataset_config_win.yaml --dataset TSIRMT --model_path result/checkpoint_TSIRMT_val_miou_0.673/checkpoint_best_val_miou_0.673.pth
+```
+
+Inference outputs are written to:
+
+```text
+outputs/<dataset>/<checkpoint_basename>/infer
+```
+
+Typical files in the inference output directory:
+
+- `infer.log`
+- `exp_config.yaml`
+- `results.csv`
+- `pr_curve.csv`
+- `roc_curve.csv`
+- `target_roc_curve.csv`
+
+If `save_pred: true` is enabled, prediction masks and logits are also exported there.
+
+## Config Notes
+
+- `configs/default.yaml` provides public dataset-config lookup entries, but the recommended usage is still to pass `--dataset_config` explicitly.
+- `configs/infer.yaml` is a template. In public usage, `--model_path` and usually `--dataset` should be provided on the command line.
+- `configs/train.yaml` disables Weights & Biases by default for public use.
+
+## Checkpoints And Reference Results
+
+Baidu download links and reference results:
 
 | Dataset  | Checkpoint: extract code                                                                                        | IoU  | nIoU | Pd | Fa |
 |-----------|---------------------------------------------------------------------------------------------------|------|------|------|------|
-| IRDST | [checkpoint: uhnj](https://pan.baidu.com/s/10_cUBX2BCjcM6h1nMwcJLw?pwd=uhnj)  | 60.80 | 59.28 | 98.68 | 17.83 |
-| NUDT-MIRSDT | [checkpoint: i58c](https://pan.baidu.com/s/1tVov97xd3mHsd61_m7XxUQ?pwd=i58c)  | 74.87 | 75.42 | 99.48 | 2.91 |
-| TSIRMT | [checkpoint: epsw](https://pan.baidu.com/s/1FgaZFkYIvZG2gDu8iip2Aw?pwd=epsw)  | 66.81 | 66.81 | 89.01 | 187.74 |
+| IRDST | [checkpoint: rgyh](https://pan.baidu.com/s/18xDxPwtBVGlepJ8QllkOPQ?pwd=rgyh)  | 63.63 | 61.18 | 97.96 | 12.74 |
+| NUDT-MIRSDT | [checkpoint: eahf](https://pan.baidu.com/s/16YvIt1B5kLWtmH0tQi-1oA?pwd=eahf)  | 74.41 | 75.02 | 99.22 | 0.19 |
+| TSIRMT | [checkpoint: he34](https://pan.baidu.com/s/1aUGnLjE5jh1Vj-lLhUNzwA?pwd=he34)  | 69.58 | 69.35 | 88.45 | 81.04 |
 
-### Acknowledgement
+Download the checkpoints from Baidu Netdisk, then place the files at these repository-relative paths before running inference:
 
-We would like to thank the open-source projects with  special thanks to [video swin transformer](https://github.com/SwinTransformer/Video-Swin-Transformer.git)  and [LMAFormer](https://github.com/lifier/LMAFormer) for making their code public. Part of the code in our project are collected and modified from several open source repositories.
+- `result/checkpoint_IRDST_val_miou_0.612/checkpoint_best_val_miou_0.612.pth`
+- `result/checkpoint_NUDT-MIRSDT_val_miou_0.727/checkpoint_best_val_miou_0.727.pth`
+- `result/checkpoint_TSIRMT_val_miou_0.673/checkpoint_best_val_miou_0.673.pth`
 
-## Citation
+## Acknowledgement
 
-Please consider citing our paper in your publications if the project helps your research. BibTeX reference is as follow.  
+We would like to thank the open-source projects with  special thanks to [video swin transformer](https://github.com/SwinTransformer/Video-Swin-Transformer.git) and [LMAFormer](https://github.com/lifier/LMAFormer) for making their code public. Part of the code in our project are collected and modified from several open source repositories.
+
+Please consider citing our paper in your publications if the project helps your research.
+
 Cite as: Wei Zhang, Tao Liu, Tianhang Guan, et al. SGMP: Spatial-Semantic Guided Motion-Aware for Infrared Small Targets. TechRxiv. June 05, 2025.
-DOI: 10.36227/techrxiv.174909854.43812513/v1Registration in progress
+
+DOI: 10.36227/techrxiv.174909854.43812513/v1

@@ -47,12 +47,12 @@ class MSCA(nn.Module):
         k = rearrange(k, 'b c h w -> b h w c')
         k = self.k_layer_norm(k)
 
-        v = q.clone()
+        # v = q.clone()
         # import ipdb;ipdb.set_trace()
         batch_size, t, h, w, _ = x_Temporal.shape
         Q = rearrange(q, 'b h w c -> (h w) b c')  # (784, B, 192)
         K = rearrange(k, 'b h w c -> (h w) b c')
-        V = rearrange(v, 'b h w c -> (h w) b c')
+        V = Q
 
         attn_output, attn_weights = self.multihead_attn(Q, K, V)
         attn_output = rearrange(attn_output, "(h w) b c -> b h w c", h=h, w=w)
@@ -66,22 +66,21 @@ class MSCA(nn.Module):
 
         return output
 
-
 class EncoderBasiclayer(nn.Module):
-    def __init__(self, spatial_layer, temporal_layer, fusion):
+    def __init__(self, spatial_layer, temporal_layer, fusionst):
         super(EncoderBasiclayer, self).__init__()
         self.spatial_layer = spatial_layer
         self.temporal_layer = temporal_layer
-        self.fusion = fusion
+        self.fusionst = fusionst
 
     def forward(self, x_spatial, x_temporal):
         x_spatial = self.spatial_layer(x_spatial)
         x_temporal = self.temporal_layer(x_temporal)
 
-        if self.fusion is None:
+        if self.fusionst is None:
             x_temporalspatial = x_temporal
         else:
-            x_temporalspatial = self.fusion(x_temporal, x_spatial)  # [1, 2, 28, 28, 192]
+            x_temporalspatial = self.fusionst(x_temporal, x_spatial)  # [1, 2, 28, 28, 192]
 
         return x_spatial, x_temporalspatial
 
@@ -93,7 +92,7 @@ class SGMP_Encoder(nn.Module):
                  resnet_depths=None,
                  swin_depths=None,
                  num_swin_heads=None,
-                 num_msca_heads=None,
+                 num_fusion_heads=None,
                  window_size: List[int] = None,
                  stochastic_depth_prob: float = 0.1,
                  is_train: bool = True):
@@ -106,8 +105,8 @@ class SGMP_Encoder(nn.Module):
         if num_swin_heads is None:
             num_swin_heads = [3, 6, 12, 24]
             # num_swin_heads = [3, 6, 12, 12]
-        if num_msca_heads is None:
-            num_msca_heads = [3, 6, 2, 2]
+        if num_fusion_heads is None:
+            num_fusion_heads = [3, 6, 2, 2]
         if window_size is None:
             window_size = [8, 7, 7]
 
@@ -162,7 +161,7 @@ class SGMP_Encoder(nn.Module):
                 self.model.append(self.maker_Basiclayer(i, resnet_stage, swin3d_stage))
             else:
                 self.model.append(
-                    self.maker_Basiclayer(i, resnet_stage, swin3d_stage, num_heads=num_msca_heads[i - 1]))
+                    self.maker_Basiclayer(i, resnet_stage, swin3d_stage, num_heads=num_fusion_heads[i - 1]))
 
         self.norm = swin3d.norm
 
@@ -175,24 +174,24 @@ class SGMP_Encoder(nn.Module):
         spatial_layer = resnet_stage[i]
         temporal_layer = swin3d_stage[i]
         if i == 0:
-            fusion = None
+            fusionst = None
         else:
             in_c = 64 * (2 ** (i - 1))
             embed_dim = 48 * (2 ** i)
-            fusion = MSCA(in_c, embed_dim, num_tl=self.num_tl, num_heads=num_heads)
+            fusionst = MSCA(in_c, embed_dim, num_tl=self.num_tl, num_heads=num_heads)
 
-        return EncoderBasiclayer(spatial_layer, temporal_layer, fusion)
+        return EncoderBasiclayer(spatial_layer, temporal_layer, fusionst)
 
     def load_checkpoint(self, resnet, swin3d):
         # 定义路径和 URL
-        resnet_path = Path('pretrain/resnet50-11ad3fa6.pth')
-        resnet_url = "https://download.pytorch.org/models/resnet50-11ad3fa6.pth"
+        # resnet_path = Path('pretrain/resnet50-11ad3fa6.pth')
+        # resnet_url = "https://download.pytorch.org/models/resnet50-11ad3fa6.pth"
         # 检查文件是否存在
-        if not resnet_path.exists():
-            print("未找到模型文件，正在下载...")
-            resnet_path.parent.mkdir(parents=True, exist_ok=True)  # 创建父目录（如果不存在）
-            request.urlretrieve(resnet_url, resnet_path)  # 下载文件
-            print(f"模型已下载至 {resnet_path}")
+        # if not resnet_path.exists():
+        #     print("未找到模型文件，正在下载...")
+        #     resnet_path.parent.mkdir(parents=True, exist_ok=True)  # 创建父目录（如果不存在）
+        #     request.urlretrieve(resnet_url, resnet_path)  # 下载文件
+        #     print(f"模型已下载至 {resnet_path}")
 
         swin3d_path = Path('pretrain/swin3d_t-7615ae03.pth')
         swin3d_url = "https://download.pytorch.org/models/swin_v2_t-b137f0e2.pth"

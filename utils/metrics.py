@@ -6,6 +6,38 @@ import cv2
 import numpy as np
 
 
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+
+    def __init__(self):
+        self.count = None
+        self.sum = None
+        self.avg = None
+        self.val = None
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+
+def eval_iou(annotation, segmentation):
+    annotation = annotation.astype(np.bool_)
+    segmentation = segmentation.astype(np.bool_)
+
+    if np.isclose(np.sum(annotation), 0) and np.isclose(np.sum(segmentation), 0):
+        return 1
+    return np.sum((annotation & segmentation)) / np.sum((annotation | segmentation), dtype=np.float32)
+
+
 class PD0_FA0():
     def __init__(self, nclass, thre):
         super(PD0_FA0, self).__init__()
@@ -57,9 +89,9 @@ class PD0_FA0():
         self.exlment_num += predits.size
 
     def get(self):
-
-        Final_FA0 = self.FA0 / self.exlment_num
-        Final_PD0 = self.PD0 / self.target
+        eps = 1e-12
+        Final_FA0 = self.FA0 / max(self.exlment_num, eps)
+        Final_PD0 = self.PD0 / max(self.target, eps)
 
         return Final_FA0, Final_PD0
 
@@ -205,11 +237,107 @@ class ROCMetric():
         return tp_rates, fp_rates, recall, precision
 
     def reset(self):
-        self.tp_arr = np.zeros([11])
-        self.pos_arr = np.zeros([11])
-        self.fp_arr = np.zeros([11])
-        self.neg_arr = np.zeros([11])
-        self.class_pos = np.zeros([11])
+        size = self.bins + 1
+        self.tp_arr = np.zeros([size])
+        self.pos_arr = np.zeros([size])
+        self.fp_arr = np.zeros([size])
+        self.neg_arr = np.zeros([size])
+        self.class_pos = np.zeros([size])
+
+
+class TargetROCMetric():
+    """Computes target-level ROC (PD vs FA pixel ratio) matching PD0_FA0 definition."""
+
+    def __init__(self, bins, match_distance=3.0):
+        super(TargetROCMetric, self).__init__()
+        self.bins = bins
+        self.match_distance = float(match_distance)
+        self.thresholds = np.linspace(0.0, 1.0, self.bins + 1)
+        self.tp_arr = np.zeros(self.bins + 1, dtype=np.float64)
+        self.fp_pixel_arr = np.zeros(self.bins + 1, dtype=np.float64)
+        self.total_targets = 0
+        self.total_pixels = 0
+
+    def _match_by_centroid(self, gt_props, pred_props):
+        if not pred_props:
+            return 0
+        pred_centroids = [np.array(prop.centroid) for prop in pred_props]
+        pred_used = [False] * len(pred_centroids)
+        tp = 0
+        for gt in gt_props:
+            gt_centroid = np.array(gt.centroid)
+            matched_idx = None
+            for idx, pred_centroid in enumerate(pred_centroids):
+                if pred_used[idx]:
+                    continue
+                if np.linalg.norm(pred_centroid - gt_centroid) < self.match_distance:
+                    matched_idx = idx
+                    break
+            if matched_idx is not None:
+                pred_used[matched_idx] = True
+                tp += 1
+        return tp
+
+    def update(self, preds, labels):
+        labels = labels.astype('int64')
+        gt_mask = labels > 0
+        gt_image = measure.label(gt_mask, connectivity=2)
+        gt_props = measure.regionprops(gt_image)
+        self.total_targets += len(gt_props)
+        self.total_pixels += preds.size
+
+        for iBin, score_thresh in enumerate(self.thresholds):
+            pred_mask = (preds > score_thresh)
+            pred_image = measure.label(pred_mask, connectivity=2)
+            pred_props = measure.regionprops(pred_image)
+            tp = self._match_by_centroid(gt_props, pred_props)
+            fp_pixels = np.logical_and(pred_mask, ~gt_mask).sum()
+            self.tp_arr[iBin] += tp
+            self.fp_pixel_arr[iBin] += fp_pixels
+
+    def get(self):
+        eps = 1e-12
+        pd = self.tp_arr / max(self.total_targets, eps)
+        fa = self.fp_pixel_arr / max(self.total_pixels, eps)
+        return pd, fa, self.thresholds
+
+    def reset(self):
+        size = self.bins + 1
+        self.thresholds = np.linspace(0.0, 1.0, size)
+        self.tp_arr = np.zeros([size], dtype=np.float64)
+        self.fp_pixel_arr = np.zeros([size], dtype=np.float64)
+        self.total_targets = 0
+        self.total_pixels = 0
+
+
+class PRMetric():
+    def __init__(self, nclass, bins):
+        super(PRMetric, self).__init__()
+        self.nclass = nclass
+        self.bins = bins
+        self.thresholds = np.linspace(0.0, 1.0, self.bins + 1)
+        self.tp_arr = np.zeros(self.bins + 1)
+        self.pos_arr = np.zeros(self.bins + 1)
+        self.class_pos = np.zeros(self.bins + 1)
+
+    def update(self, preds, labels):
+        for iBin, score_thresh in enumerate(self.thresholds):
+            i_tp, i_pos, _, _, i_class_pos = cal_tp_pos_fp_neg(preds, labels, self.nclass, score_thresh)
+            self.tp_arr[iBin] += i_tp
+            self.pos_arr[iBin] += i_pos
+            self.class_pos[iBin] += i_class_pos
+
+    def get(self):
+        recall = self.tp_arr / (self.pos_arr + 0.001)
+        precision = self.tp_arr / (self.class_pos + 0.001)
+        return precision, recall, self.thresholds
+
+    def reset(self):
+        size = self.bins + 1
+        self.thresholds = np.linspace(0.0, 1.0, size)
+        self.tp_arr = np.zeros([size])
+        self.pos_arr = np.zeros([size])
+        self.class_pos = np.zeros([size])
 
 
 class PD_FA():
@@ -268,15 +396,43 @@ class PD_FA():
             self.exlment_num += predits.size
 
     def get(self):
-
-        Final_FA = self.FA / self.exlment_num
-        Final_PD = self.PD / self.target
+        eps = 1e-12
+        Final_FA = self.FA / max(self.exlment_num, eps)
+        Final_PD = self.PD / np.maximum(self.target, eps)
 
         return Final_FA, Final_PD
 
     def reset(self):
         self.FA = np.zeros([self.bins + 1])
         self.PD = np.zeros([self.bins + 1])
+
+
+class mIoU:
+
+    def __init__(self, nclass):
+        super(mIoU, self).__init__()
+        self.nclass = nclass
+        self.reset()
+
+    def update(self, preds, labels):
+        correct, labeled = batch_pix_accuracy(preds, labels)
+        inter, union = batch_intersection_union(preds, labels, self.nclass)
+        self.total_correct += correct
+        self.total_label += labeled
+        self.total_inter += inter
+        self.total_union += union
+
+    def get(self):
+        pixAcc = 1.0 * self.total_correct / (np.spacing(1) + self.total_label)
+        iou = 1.0 * self.total_inter / (np.spacing(1) + self.total_union)
+        miou = iou.mean()
+        return pixAcc, miou
+
+    def reset(self):
+        self.total_inter = 0
+        self.total_union = 0
+        self.total_correct = 0
+        self.total_label = 0
 
 
 def cal_tp_pos_fp_neg(output, target, nclass, score_thresh):
@@ -301,3 +457,43 @@ def cal_tp_pos_fp_neg(output, target, nclass, score_thresh):
     class_pos = tp + fp
 
     return tp, pos, fp, neg, class_pos
+
+
+def batch_pix_accuracy(output, target):
+    if len(target.shape) == 3:
+        target = np.expand_dims(target.float(), axis=1)
+    elif len(target.shape) == 4:
+        target = target.float()
+    else:
+        raise ValueError("Unknown target dimension")
+
+    assert output.shape == target.shape, "Predict and Label Shape Don't Match"
+    predict = (output > 0).float()
+    pixel_labeled = (target > 0).float().sum()
+    pixel_correct = (((predict == target).float()) * ((target > 0)).float()).sum()
+
+    assert pixel_correct <= pixel_labeled, "Correct area should be smaller than Labeled"
+    return pixel_correct, pixel_labeled
+
+
+def batch_intersection_union(output, target, nclass):
+    mini = 1
+    maxi = 1
+    nbins = 1
+    predict = (output > 0).float()
+    if len(target.shape) == 3:
+        target = np.expand_dims(target.float(), axis=1)
+    elif len(target.shape) == 4:
+        target = target.float()
+    else:
+        raise ValueError("Unknown target dimension")
+    intersection = predict * ((predict == target).float())
+
+    area_inter, _ = np.histogram(intersection.cpu(), bins=nbins, range=(mini, maxi))
+    area_pred, _ = np.histogram(predict.cpu(), bins=nbins, range=(mini, maxi))
+    area_lab, _ = np.histogram(target.cpu(), bins=nbins, range=(mini, maxi))
+    area_union = area_pred + area_lab - area_inter
+
+    assert (area_inter <= area_union).all(), \
+        "Error: Intersection area should be smaller than Union area"
+    return area_inter, area_union

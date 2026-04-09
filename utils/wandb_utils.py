@@ -1,6 +1,5 @@
 import pathlib
 from typing import Optional, Dict, List
-import wandb
 import torch
 import numpy as np
 import random
@@ -17,6 +16,7 @@ def init_or_resume_wandb_run(wandb_id_file_path: pathlib.Path,
         from there, otherwise write the run id to file.
         Returns the config, if it's not None it will also update it first
     """
+    import wandb
     # if the run_id was previously saved, resume from there
 
     blacklist = ['experiment_name', 'wandb_resume_id', 'is_train', 'device','pretrain_settings']  # 定义不需要的键

@@ -419,6 +419,7 @@ class PhotometricDistort(object):
                 distort = Compose(self.pd[1:])
             img, target = distort(img, target)
             img, target = self.rand_light_noise(img, target)
+            img = np.clip(img, 0, 255)
             imgs.append(Image.fromarray(img.astype('uint8')))
         return imgs, target
 

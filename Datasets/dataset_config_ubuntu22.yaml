@@ -2,23 +2,23 @@
 TSIRMT:
   train_seqs_file: Datasets/TSIRMT/train_new.txt
   val_seqs_file: Datasets/TSIRMT/val_new.txt
-  img_path: D:/path/to/TSIRMT/images
-  mask_path: D:/path/to/TSIRMT/masks
+  img_path: /path/to/TSIRMT/images
+  mask_path: /path/to/TSIRMT/masks
 
 NUDT-MIRSDT:
   train_seqs_file: Datasets/NUDT-MIRSDT/train_new.txt
   val_seqs_file: Datasets/NUDT-MIRSDT/val_new.txt
-  img_path: D:/path/to/NUDT-MIRSDT/images
-  mask_path: D:/path/to/NUDT-MIRSDT/masks
+  img_path: /path/to/NUDT-MIRSDT/images
+  mask_path: /path/to/NUDT-MIRSDT/masks
 
 IRDST:
   train_seqs_file: Datasets/IRDST/train_new.txt
   val_seqs_file: Datasets/IRDST/val_new.txt
-  img_path: D:/path/to/IRDST/images
-  mask_path: D:/path/to/IRDST/masks
+  img_path: /path/to/IRDST/images
+  mask_path: /path/to/IRDST/masks
 
 TSIRMT_tiny:
   train_seqs_file: Datasets/TSIRMT_tiny/train_new.txt
   val_seqs_file: Datasets/TSIRMT_tiny/val_new.txt
-  img_path: D:/path/to/TSIRMT_tiny/images
-  mask_path: D:/path/to/TSIRMT_tiny/masks
+  img_path: /path/to/TSIRMT_tiny/images
+  mask_path: /path/to/TSIRMT_tiny/masks

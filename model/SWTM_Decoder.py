@@ -35,7 +35,7 @@ class Patch_Expand(nn.Module):
         return x
 
 
-class Decoder(nn.Module):
+class SWTM_Decoder(nn.Module):
     def __init__(self,
                  embed_dim: int,
                  depths: List[int] = None,
@@ -49,7 +49,7 @@ class Decoder(nn.Module):
                  block: Optional[Callable[..., nn.Module]] = None,
                  upsample_layer: Callable[..., nn.Module] = Patch_Expand,
                  ):
-        super(Decoder, self).__init__()
+        super(SWTM_Decoder, self).__init__()
         if depths is None:
             depths = [2, 6, 2]
         if num_heads is None:
@@ -162,7 +162,7 @@ if __name__ == '__main__':
 
     num_heads = [3, 6, 12, 24]
     window_size = [7, 7]
-    decode = Decoder(embed_dim=768)
+    decode = SWTM_Decoder(embed_dim=768)
     decode.eval()
     from torchinfo import summary
     # summary(decode, input_data=[x0, x1, x2, x3])
