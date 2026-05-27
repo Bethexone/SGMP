@@ -2,7 +2,7 @@
 
 PyTorch implementation of `SGMP-UNet: Spatial-Semantic Guided Motion-Aware UNet for Infrared Small Targets`.
 
-[Project](https://github.com/Bethexone/SGMP.git) - [Paper](https://www.techrxiv.org/users/921880/articles/1296074-sgmp-spatial-semantic-guided-motion-aware-for-infrared-small-targets)
+[Project](https://github.com/Bethexone/SGMP.git) - [Paper](https://www.sciencedirect.com/science/article/pii/S1077314226001840)
 
 ![Architecture](flow_chart.png)
 
@@ -187,6 +187,18 @@ We would like to thank the open-source projects with  special thanks to [video s
 
 Please consider citing our paper in your publications if the project helps your research.
 
-Cite as: Wei Zhang, Tao Liu, Tianhang Guan, et al. SGMP: Spatial-Semantic Guided Motion-Aware for Infrared Small Targets. TechRxiv. June 05, 2025.
-
-DOI: 10.36227/techrxiv.174909854.43812513/v1
+```bibtex
+@article{ZHANG2026104817,
+  title = {SGMP: Spatial-Semantic Guided Motion-Perception for infrared small targets},
+  journal = {Computer Vision and Image Understanding},
+  volume = {269},
+  pages = {104817},
+  year = {2026},
+  issn = {1077-3142},
+  doi = {https://doi.org/10.1016/j.cviu.2026.104817},
+  url = {https://www.sciencedirect.com/science/article/pii/S1077314226001840},
+  author = {Wei Zhang and Tao Liu and Tianhang Guan and Jia Gao},
+  keywords = {Infrared small target detection, Motion-aware feature extraction, Semantic-guided attention},
+  abstract = {In temporal infrared small target detection, the effective exploitation of motion pattern discrepancies between targets and backgrounds is crucial for achieving accurate detection. Although existing convolutional neural network (CNN)-based architectures benefit from local feature perception, their limited receptive fields hinder the modeling of long-range temporal dependencies, especially in scenes with dynamic complexity, leading to a notable degradation in feature discrimination. Transformer-based architectures have been demonstrated to address the issue of long-sequence dependency through self-attention mechanisms, the uniform global interaction tends to dilute the representation of subtle local motion patterns, which are crucial for small target detection. To overcome these limitations, we propose a backbone network, called Spatial-Semantic Guided Motion Perception (SGMP). SGMP introduces a spatially semantic guided attention mechanism that (i) leverages spatial features to generate salient semantic query vectors and value maps for extracting potential semantic priors of targets, and (ii) incorporates a Transformer encoder to model long-range motion features, aligning global motion context with local semantic cues across modalities. The design enables it to focus on motion-sensitive spatiotemporal regions associated with small targets. Built upon SGMP, we design a lightweight and efficient detection framework called SGMP-UNet, which fully exploits motion-aware representations for end-to-end small target detection. Extensive experiments on the NUDT-MIRSDT, IRSDT and TSIRMT datasets demonstrate that SGMP-UNet consistently outperforms state-of-the-art (SOTA) methods across multiple evaluation metrics. Our code will be available at https://github.com/Bethexone/SGMP.git.}
+}
+```
